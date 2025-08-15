@@ -1,0 +1,13 @@
+Mini ATM System - Submission
+
+GitHub Repo: <ADD LINK HERE>
+Hosted URL: <ADD LINK HERE>
+
+How to test quickly:
+1) GET {HOST}/accounts/1001/balance
+2) POST {HOST}/accounts/1001/deposit {"amount":"25.00"}
+3) POST {HOST}/accounts/1001/withdraw {"amount":"10.00"}
+
+Notes:
+- Data is in-memory; resets on restart.
+- Amount must be > 0; overdrafts return 400.
