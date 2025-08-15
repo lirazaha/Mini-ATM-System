@@ -1,99 +1,137 @@
-# Mini ATM System (Server-Side)
+# Mini ATM System
+Live Demo: https://mini-atm-system.onrender.com/docs
+A FastAPI-based REST API that simulates ATM banking operations with in-memory storage, transaction history, and production-ready features.
 
-A tiny ATM API built with FastAPI. Data is stored **in-memory** (resets on restart).
+## Overview
+This project implements a complete ATM system backend with three core banking operations: balance inquiry, deposit, and withdrawal. The system uses in-memory storage with thread-safe operations and includes advanced features like idempotency, transaction logging, and comprehensive error handling.
 
 ## Features
-- Get balance: `GET /accounts/{account_number}/balance`
-- Deposit: `POST /accounts/{account_number}/deposit`
-- Withdraw: `POST /accounts/{account_number}/withdraw`
-- Validation: positive amounts, sufficient funds
-- Uses `Decimal` for money, rounded to 2dp
-- Seed accounts: `1001=500.00`, `1002=1250.75`, `9999=0.00`
 
-## Quickstart (local)
+### Core Banking Operations
+Balance Inquiry – Get current account balance
+Deposit – Add money with validation
+Withdrawal – Remove money with overdraft protection
+Transaction History – Audit trail of all operations
+
+### Advanced Features
+Decimal Precision – Accurate monetary calculations with Decimal
+Thread Safety – Per-account locks prevent race conditions
+Idempotency – Idempotency-Key header prevents duplicate operations
+Structured Logging – Contextual logs for debugging and monitoring
+Error Handling – Consistent JSON error schema
+Health Monitoring – /healthz endpoint for status checks
+
+## Technology Stack
+FastAPI – Modern Python web framework
+Pydantic – Data validation and serialization
+Uvicorn – ASGI server
+pytest – Testing framework
+GitHub Actions – CI pipeline
+
+## Quick Start
+### Installation
+```git clone https://github.com/lirazaha/Mini-ATM-System
+cd Mini-ATM-System
+python -m venv venv
+source venv/bin/activate   # On Windows: venv\Scripts\activate
+pip install -r requirements.txt```
+
+### Run Locally
+```uvicorn app.main:app --reload```
+The API will be available at:
+- **API Docs**: http://127.0.0.1:8000/docs
+- **Health Check**: http://127.0.0.1:8000/healthz
+
+## API Endpoints
+### Health Check
+```GET /healthz```
+Returns server status and version information.
+
+### Get Balance
+```GET /accounts/{account_number}/balance```
+Retrieves the current balance for the specified account.
+
+### Deposit Money
+```POST /accounts/{account_number}/deposit```
+Retrieves the deposit money for the specified account.
+
+### Withdraw Money
+```POST /accounts/{account_number}/withdraw```
+Retrieves the withdraw money for the specified account.
+
+### Transaction History
+```GET /accounts/{account_number}/transactions```
+Returns all transactions for the specified account.
+
+## Idempotency Support
+Prevent duplicate operations by including an `Idempotency-Key`:
+
 ```bash
-python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-# browse http://127.0.0.1:8000/docs
+curl -X POST http://localhost:8000/accounts/1001/deposit \
+     -H "Content-Type: application/json" \
+     -H "Idempotency-Key: unique-key-123" \
+     -d '{"amount": "10.00"}'
 ```
+The system caches responses for 10 minutes. Repeated requests with the same key return the cached result.
 
-## API Examples (curl)
-```bash
-curl http://localhost:8000/accounts/1001/balance
+## Test Accounts
+The system comes pre-loaded with test accounts:
+Account Numbers - 1001, 1002, 9999
+Initial Balance - $500.00, $1250.75, $0.0, respectively
 
-curl -X POST http://localhost:8000/accounts/1001/deposit       -H "Content-Type: application/json" -d '{"amount":"25.00"}'
+## Error Handling
+All errors return a consistent Json format:
+```{ "error": "Error description" }```
+HTTP Status Codes:
+- `200` - Success
+- `400` - Bad request (insufficient funds, invalid amount)
+- `404` - Account not found
+- `422` - Validation error
 
-curl -X POST http://localhost:8000/accounts/1001/withdraw       -H "Content-Type: application/json" -d '{"amount":"10.00"}'
-```
-
-### Responses
-- 200: `{ "account_number": "1001", "balance": "515.00" }`
-- 400: `{ "detail": "insufficient funds" }` or `{ "detail": "amount must be > 0" }`
-- 404: `{ "detail": "account not found" }`
-
-## Tests
-```bash
-pytest -q
-```
+## Testing
+Run tests with pytest:
+```pytest -v```
+Coverage includes:
+Health check
+Balance retrieval
+Deposits & withdrawals
+Overdraft prevention
+Invalid accounts
+Validation of positive amounts
+Idempotency
+Transaction history
 
 ## Deployment
 
-### Option A: Render (no Docker)
-1. Push this repo to GitHub.
-2. Create a new **Web Service** on Render, connect the repo.
-3. **Build Command:** `pip install -r requirements.txt`
-   **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-4. Deploy. Copy the public URL for submission.
+### Render
+The project includes `render.yaml` for easy deployment:
+1. Connect the repository to Render
+2. Create a new Web Service
+3. Render will automatically use the configuration
 
-### Option B: Heroku (with Dockerfile or Procfile)
-**Using Procfile (no Docker):**
-1. Install the Heroku CLI and login.
-2. `heroku create`
-3. `heroku buildpacks:add heroku/python`
-4. `git push heroku main` (or `master`)
-5. `heroku ps:scale web=1`
-6. `heroku open`
+## Implementation Details
+Money Handling – Decimal with rounding to 2dp (ROUND_HALF_UP)
+Concurrency – Per-account locks ensure thread safety
+Audit Trail – Every operation logged in-memory
+Idempotency – Prevents duplicate POSTs
+Logging – Structured logs with contextual info
+Storage – In-memory only (resets on restart)
 
-**Using Dockerfile:**
-```Dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-Build & run locally:
-```bash
-docker build -t mini-atm .
-docker run -p 8000:8000 mini-atm
-```
+## Challenges
+Precision in money handling – Solved with Decimal
+Concurrent updates – Solved with per-account locks
+Retry safety – Solved with Idempotency-Key header
+Error consistency – Solved with custom exception handlers
+Traceability – Solved with transaction log endpoint
 
-## Notes & Design Decisions
-- In-memory store with a single process-wide lock is sufficient for this task.
-- `Decimal` avoids float rounding issues.
-- Pydantic validation ensures positive amounts.
-- Seeded accounts simplify evaluation.
+## Development
+### Code Quality
+- Type hints throughout the codebase
+- Pydantic models for data validation
+- Consistent error handling patterns
+- Comprehensive test coverage
 
-
-## Extras added
-- **/healthz** endpoint
-- **Consistent error schema**: `{ "error": "..." }` for 4xx/5xx
-- **Per-account locks** (better concurrency)
-- **Idempotency** for POSTs via `Idempotency-Key` header (TTL 10 minutes)
-- **Audit trail**: `GET /accounts/{account_number}/transactions`
-- **Pre-commit**: Black + Ruff
-- **CI**: GitHub Actions runs tests on every push
-
-### Transactions endpoint
-```bash
-curl http://localhost:8000/accounts/1001/transactions
-# {"account_number":"1001","transactions":[{"ts":"2025-08-15T14:00:00Z","type":"deposit","amount":"50.00","balance":"550.00"}, ...]}
-```
-
-### Idempotency header example
-```bash
-curl -X POST http://localhost:8000/accounts/1001/deposit       -H "Content-Type: application/json"       -H "Idempotency-Key: my-unique-key-123"       -d '{"amount":"10.00"}'
-```
+### CI/CD
+- GitHub Actions workflow runs tests on every push
+- Automated testing ensures code quality
+- Ready for integration with deployment pipelines
